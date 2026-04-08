@@ -93,6 +93,7 @@ def test_detect_system_resources(monkeypatch, tmp_path):
         "MemAvailable:   20000000 kB\n"
     )
 
+
     _real_open = open
 
     def fake_open(path, **kw):
