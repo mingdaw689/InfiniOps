@@ -61,7 +61,7 @@ QueryKey ToKey(const Query& query) {
 
 class State {
  public:
-  // 中文注释：全局自动调优状态由单例维护，便于在任意算子调用路径共享缓存。
+  // 全局自动调优状态由单例维护，便于在任意算子调用路径共享缓存
   static State& Instance() {
     static State state;
     return state;
@@ -151,7 +151,7 @@ class State {
   }
 
   void FlushLocked() {
-    // 中文注释：只有在有更新且路径有效时才落盘，避免无意义 IO。
+    // 只有在有更新且路径有效时才缓存，避免无意义 IO
     if (!dirty_.load(std::memory_order_relaxed)) return;
     if (cache_path_.empty()) return;
 
@@ -180,7 +180,7 @@ class State {
     out.close();
     if (!out.good()) return;
 
-    // 中文注释：同目录 rename 在大多数文件系统是原子替换，避免写入中断导致半文件。
+    // 同目录 rename 在大多数文件系统是原子替换，避免写入中断导致半文件
     fs::rename(tmp_path, cache_path_, ec);
     if (ec) return;
     dirty_.store(false, std::memory_order_relaxed);
@@ -213,7 +213,7 @@ class State {
       int value = std::stoi(parts[4].substr(eq_pos + 1));
       return std::make_pair(std::move(key), value);
     } catch (...) {
-      // 中文注释：缓存文件允许历史脏数据，解析失败时跳过该行即可，不阻断主流程。
+      // 缓存文件允许历史脏数据，解析失败时跳过该行即可，不阻断主流程
       return std::nullopt;
     }
   }
@@ -252,11 +252,11 @@ void Disable() { State::Instance().Disable(); }
 void Flush() { State::Instance().Flush(); }
 
 Mode ResolveMode(const Config& config) {
-  // 中文注释：显式 API 的全局模式优先，便于统一控制全进程行为。
+  // 显式 API 的全局模式优先，便于统一控制全进程行为
   const auto global_mode = State::Instance().mode();
   if (global_mode != Mode::kDisabled) return global_mode;
 
-  // 中文注释：当全局模式未开启时，允许按 Config 做每次调用级别的细粒度控制。
+  // 当全局模式未开启时，允许按 Config 做每次调用级别的细粒度控制
   if (!config.autotune_enabled()) return Mode::kDisabled;
   if (config.autotune_record_only()) return Mode::kWarmupRecord;
   return Mode::kTuneAndUse;
