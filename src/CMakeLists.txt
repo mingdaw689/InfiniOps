@@ -172,12 +172,32 @@ if(WITH_CAMBRICON)
     list(APPEND DEVICE_LIST "cambricon")
 endif()
 
+if(WITH_TORCH)
+    set(TORCH_PATTERNS
+        "torch/*.cc"
+        "torch/*.cpp"
+    )
+
+    file(GLOB_RECURSE TORCH_SOURCES CONFIGURE_DEPENDS ${TORCH_PATTERNS})
+
+    target_compile_definitions(infiniops PUBLIC WITH_TORCH=1)
+    target_sources(infiniops PRIVATE ${TORCH_SOURCES})
+    target_link_libraries(infiniops PUBLIC ${TORCH_LIBRARIES})
+    target_include_directories(infiniops PUBLIC ${TORCH_INCLUDE_DIRS})
+endif()
+
 target_include_directories(infiniops PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(GENERATE_PYTHON_BINDINGS)
     find_package(Python COMPONENTS Interpreter REQUIRED)
+
+    set(GENERATOR_ARGS --devices ${DEVICE_LIST})
+    if(WITH_TORCH)
+        list(APPEND GENERATOR_ARGS --with-torch)
+    endif()
+
     execute_process(
-        COMMAND ${Python_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/generate_wrappers.py --devices ${DEVICE_LIST}
+        COMMAND ${Python_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/generate_wrappers.py ${GENERATOR_ARGS}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         RESULT_VARIABLE script_result
     )
