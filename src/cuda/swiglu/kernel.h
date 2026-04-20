@@ -13,6 +13,11 @@
 
 namespace infini::ops {
 
+inline bool IsValidSwigluCudaBlockSize(int block_size) {
+  return block_size == 128 || block_size == 256 || block_size == 512 ||
+         block_size == 1024 || block_size == 2048;
+}
+
 template <typename Backend>
 class CudaSwiglu : public Swiglu {
  public:
@@ -58,7 +63,16 @@ class CudaSwiglu : public Swiglu {
 
   void operator()(const Tensor input, const Tensor gate,
                   Tensor out) const override {
-    int block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
+    int block_size = 0;
+    if (auto tuned = config_.autotune_int_param("cuda_swiglu_block_size");
+        tuned.has_value()) {
+      block_size = *tuned;
+    }
+    // 当未设置调优参数或参数非法时，回退到原有默认策略，确保兼容
+    if (block_size == 0 || !IsValidSwigluCudaBlockSize(block_size)) {
+      block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
+    }
+
     DispatchFunc<AllFloatTypes, AllCudaBlockSizes>(
         {static_cast<int64_t>(out_type_), block_size},
         [&](auto list_tag) {

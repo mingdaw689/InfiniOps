@@ -9,6 +9,9 @@
 
 namespace infini::ops {
 class Add;
+class CausalSoftmax;
+class RmsNorm;
+class Swiglu;
 }
 
 namespace infini::ops::autotune {
@@ -40,7 +43,7 @@ struct Policy<Add> {
   }
 
   // 要调优的参数
-  static std::string ParamName() { return "cuda_block_size"; }
+  static std::string ParamName() { return "cuda_add_block_size"; }
 
   // 候选参数值集合
   static std::vector<int> IntCandidates(const Config&) {
@@ -55,7 +58,79 @@ struct Policy<Add> {
 
   // 把选中的参数真正写到运行配置里
   static void ApplyInt(Config& config, int value) {
-    config.set_cuda_block_size_override(value);
+    config.set_autotune_int_param(ParamName(), value);
+  }
+};
+
+template <>
+struct Policy<CausalSoftmax> {
+  static constexpr bool kEnabled = true;
+
+  static bool SupportsDevice(Device::Type device_type) {
+    return device_type == Device::Type::kNvidia;
+  }
+
+  static std::string ParamName() { return "cuda_causal_softmax_block_size"; }
+
+  static std::vector<int> IntCandidates(const Config&) {
+    return {128, 256, 512, 1024, 2048};
+  }
+
+  static bool ValidateIntCandidate(int value) {
+    return value == 128 || value == 256 || value == 512 || value == 1024 ||
+           value == 2048;
+  }
+
+  static void ApplyInt(Config& config, int value) {
+    config.set_autotune_int_param(ParamName(), value);
+  }
+};
+
+template <>
+struct Policy<Swiglu> {
+  static constexpr bool kEnabled = true;
+
+  static bool SupportsDevice(Device::Type device_type) {
+    return device_type == Device::Type::kNvidia;
+  }
+
+  static std::string ParamName() { return "cuda_swiglu_block_size"; }
+
+  static std::vector<int> IntCandidates(const Config&) {
+    return {128, 256, 512, 1024, 2048};
+  }
+
+  static bool ValidateIntCandidate(int value) {
+    return value == 128 || value == 256 || value == 512 || value == 1024 ||
+           value == 2048;
+  }
+
+  static void ApplyInt(Config& config, int value) {
+    config.set_autotune_int_param(ParamName(), value);
+  }
+};
+
+template <>
+struct Policy<RmsNorm> {
+  static constexpr bool kEnabled = true;
+
+  static bool SupportsDevice(Device::Type device_type) {
+    return device_type == Device::Type::kNvidia;
+  }
+
+  static std::string ParamName() { return "cuda_rms_norm_block_size"; }
+
+  static std::vector<int> IntCandidates(const Config&) {
+    return {128, 256, 512, 1024, 2048};
+  }
+
+  static bool ValidateIntCandidate(int value) {
+    return value == 128 || value == 256 || value == 512 || value == 1024 ||
+           value == 2048;
+  }
+
+  static void ApplyInt(Config& config, int value) {
+    config.set_autotune_int_param(ParamName(), value);
   }
 };
 

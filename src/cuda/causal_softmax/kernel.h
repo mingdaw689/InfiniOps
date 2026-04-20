@@ -7,10 +7,16 @@
 #include "base/causal_softmax.h"
 #include "cuda/causal_softmax/kernel.cuh"
 #include "cuda/kernel_commons.cuh"
+#include "cuda/runtime_utils.h"
 #include "data_type.h"
 #include "dispatcher.h"
 
 namespace infini::ops {
+
+inline bool IsValidCausalSoftmaxCudaBlockSize(int block_size) {
+  return block_size == 128 || block_size == 256 || block_size == 512 ||
+         block_size == 1024 || block_size == 2048;
+}
 
 template <typename Backend>
 class CudaCausalSoftmax : public CausalSoftmax {
@@ -31,7 +37,16 @@ class CudaCausalSoftmax : public CausalSoftmax {
 
     assert(out.dtype() == input.dtype());
 
-    int block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
+    int block_size = 0;
+    if (auto tuned =
+            config_.autotune_int_param("cuda_causal_softmax_block_size");
+        tuned.has_value()) {
+      block_size = *tuned;
+    }
+    // 当未设置调优参数或参数非法时，回退到原有默认策略，保持兼容
+    if (block_size == 0 || !IsValidCausalSoftmaxCudaBlockSize(block_size)) {
+      block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
+    }
 
     DispatchFunc<ConcatType<List<DataType::kFloat32>, ReducedFloatTypes>,
                  AllCudaBlockSizes>(

@@ -13,6 +13,11 @@
 
 namespace infini::ops {
 
+inline bool IsValidRmsNormCudaBlockSize(int block_size) {
+  return block_size == 128 || block_size == 256 || block_size == 512 ||
+         block_size == 1024 || block_size == 2048;
+}
+
 template <typename Backend>
 class CudaRmsNorm : public RmsNorm {
  public:
@@ -34,7 +39,15 @@ class CudaRmsNorm : public RmsNorm {
 
     assert(out.dtype() == input.dtype() && out.dtype() == weight.dtype());
 
-    int block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
+    int block_size = 0;
+    if (auto tuned = config_.autotune_int_param("cuda_rms_norm_block_size");
+        tuned.has_value()) {
+      block_size = *tuned;
+    }
+    // 当未设置调优参数或参数非法时，回退到原有默认策略，确保兼容
+    if (block_size == 0 || !IsValidRmsNormCudaBlockSize(block_size)) {
+      block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
+    }
 
     DispatchFunc<ConcatType<List<DataType::kFloat32>, ReducedFloatTypes>,
                  AllCudaBlockSizes>(

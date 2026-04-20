@@ -58,8 +58,12 @@ class CudaAdd : public Add {
 
   void operator()(const Tensor input, const Tensor other,
                   Tensor out) const override {
-    int block_size = config_.cuda_block_size_override();
-    // 当外部未指定 override（值为 0）时，保持原有自动选择策略，确保兼容
+    int block_size = 0;
+    if (auto tuned = config_.autotune_int_param("cuda_add_block_size");
+        tuned.has_value()) {
+      block_size = *tuned;
+    }
+    // 中文注释：当未设置调优参数或参数非法时，回退到原有默认策略，确保兼容。
     if (block_size == 0 || !detail::IsAllowedCudaBlockSize(block_size)) {
       block_size = RuntimeUtils<Backend::kDeviceType>::GetOptimalBlockSize();
     }
