@@ -605,7 +605,6 @@ def _generate_pybind11(operator):
             )
             py_args = _generate_py_args(call)
             py_args_str = f"{py_args}, " if py_args else ""
-            default_impl_index = _default_impl_index_expr(call)
 
             return (
                 f'  m.def("{op_name}", []({params}) {{\n'
@@ -981,8 +980,7 @@ def _generate_generated_dispatch_entries(operator):
     symbol_name = _op_symbol_name(operator.name)
     op_type = _op_cpp_type(operator.name)
     declarations = [
-        f"std::vector<std::size_t> ActiveImplementationIndicesFor"
-        f"{symbol_name}(Device::Type dev_type);"
+        f"std::vector<std::size_t> ActiveImplementationIndicesFor{symbol_name}(Device::Type dev_type);"
     ]
     definitions = [
         f"""std::vector<std::size_t> ActiveImplementationIndicesFor{symbol_name}(Device::Type dev_type) {{
@@ -1127,10 +1125,7 @@ def _generate_operator_call_instantiation_entries(operator):
         if arg.spelling in optional_non_tensor_params:
             return False
 
-        if arg.spelling in optional_tensor_params:
-            return True
-
-        return False
+        return arg.spelling in optional_tensor_params
 
     def _is_vector_tensor(arg):
         if arg.spelling in vector_tensor_params:
@@ -1667,33 +1662,20 @@ if __name__ == "__main__":
 
     if use_monolithic_bindings:
         op_includes = "\n".join(op_includes)
-        ops_source = f"""#include <pybind11/pybind11.h>
-
-// Generated with `INFINI_OPS_MONOLITHIC_BINDINGS=1`.
+        binding_preamble = f"""// Generated with `INFINI_OPS_MONOLITHIC_BINDINGS=1`.
 {op_includes}
-
-#include "tuning.h"
-
-namespace infini::ops {{
-
-PYBIND11_MODULE(ops, m) {{
-  const char* tuning_path = std::getenv("INFINI_OPS_TUNING_PATH");
-  if (!tuning_path) {{
-    tuning_path = "tuning.json";
-  }}
-  infini::ops::TuningManager::Instance().LoadTuningCache(tuning_path);
-{textwrap.indent(bind_func_calls, _INDENTATION)}
-}}
-
-}}  // namespace infini::ops
 """
+        bind_func_declarations = ""
     else:
+        binding_preamble = ""
         bind_func_declarations = "\n".join(
             f"void {bind_func_name}(pybind11::module& m);"
             for bind_func_name in bind_func_names
         )
-        ops_source = f"""#include <pybind11/pybind11.h>
 
+    ops_source = f"""#include <pybind11/pybind11.h>
+
+{binding_preamble}
 #include "tuning.h"
 
 namespace infini::ops {{
@@ -1701,11 +1683,7 @@ namespace infini::ops {{
 {bind_func_declarations}
 
 PYBIND11_MODULE(ops, m) {{
-  const char* tuning_path = std::getenv("INFINI_OPS_TUNING_PATH");
-  if (!tuning_path) {{
-    tuning_path = "tuning.json";
-  }}
-  infini::ops::TuningManager::Instance().LoadTuningCache(tuning_path);
+  TuningManager::Instance().InitializeFromEnvironment();
 {textwrap.indent(bind_func_calls, _INDENTATION)}
 }}
 

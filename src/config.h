@@ -2,23 +2,24 @@
 #define INFINI_OPS_CONFIG_H_
 
 #include <cstddef>
+#include <optional>
 
 namespace infini::ops {
 
 class Config {
  public:
-  std::size_t implementation_index() const { return implementation_index_; }
+  std::size_t implementation_index() const {
+    return implementation_index_.value_or(0);
+  }
 
   void set_implementation_index(std::size_t implementation_index) {
     implementation_index_ = implementation_index;
-    auto_select_ = false;
   }
 
-  bool auto_select() const { return auto_select_; }
+  bool auto_select() const { return !implementation_index_.has_value(); }
 
  private:
-  std::size_t implementation_index_{0};
-  bool auto_select_{true};
+  std::optional<std::size_t> implementation_index_;
 };
 
 }  // namespace infini::ops
